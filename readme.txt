@@ -4,6 +4,7 @@ Donate link: http://example.com/
 Tags: WooCommerce, Tranzila
 Requires at least: 3.8.1
 Tested up to: 3.8.1
+Stable tag: 1.0.1
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
