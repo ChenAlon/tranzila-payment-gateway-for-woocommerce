@@ -3,7 +3,7 @@
 Plugin Name: WooCommerce Tranzila Gateway
 Plugin URI: http://woothemes.com/woocommerce
 Description: Extends WooCommerce with an Tranzila gateway.
-Version: 1.0.1
+Version: 1.0.2
 Author: Dan Green
 Author URI: http://tlvwebdevelopment.com
 License: GNU General Public License v3.0
@@ -111,10 +111,21 @@ function woocommerce_gateway_tranzila_init() {
 	 		$order = new WC_Order( $order_id );
 	 		$_SESSION['tranzila_token'] = mt_rand();
 	 		$_SESSION['encryption-key'] = mt_rand();
-	 		
+	 		// Get the product list
+	 		global $woocommerce; 	
+	 		$items = $woocommerce->cart->get_cart();
+	 		$i = 0;
+	 		$len = count($items);	 	
+	 		foreach($items as $item => $values) { 
+	 			$_product = $values['data']->post;
+	 			$description .= $values['quantity']. " x ". $_product->post_title;
+	 			if ($i != $len - 1) $description .= ", ";
+	 			$i++;
+	 		}
+	 
 			$tranzila_data = array(
 				'sum' => $order -> get_order_total(),
-				'pdesc' => $productinfo,
+				'pdesc' => $description,
 				'contact' => $order -> billing_first_name." ".$order -> billing_last_name,
 				'company' => "Personal",
 				'email' => $order -> billing_email,
