@@ -3,7 +3,7 @@
 Plugin Name: WooCommerce Tranzila Gateway
 Plugin URI: http://woothemes.com/woocommerce
 Description: Extends WooCommerce with an Tranzila gateway.
-Version: 1.0.2
+Version: 1.0.3
 Author: Dan Green
 Author URI: http://tlvwebdevelopment.com
 License: GNU General Public License v3.0
@@ -37,7 +37,7 @@ function woocommerce_gateway_tranzila_init() {
 			$this -> id = 'tranzila';
 			$this -> medthod_title = 'tranzila';
 			$this -> has_fields = false;
-			
+			$this -> icon = "/wp-content/plugins/tranzila-payment-gateway-for-woocommerce/logo.png";
 			$this -> init_form_fields();
 			$this -> init_settings();
 			
@@ -45,7 +45,7 @@ function woocommerce_gateway_tranzila_init() {
 			$this -> description = $this -> get_option('description');
 			$this -> merchant_id = $this -> get_option('merchant_id');
 			$_SESSION['tranzila_terminal'] = $this->get_option('terminal_name');		
-			$this->order_button_text = __( 'Proceed to Tranzila', 'woocommerce' );
+			$this->order_button_text = __( 'המשך לדף הסליקה המאובטח', 'woocommerce' );
 
 
 			
@@ -109,7 +109,7 @@ function woocommerce_gateway_tranzila_init() {
 	 		global $woocommerce;
 	 		
 	 		$order = new WC_Order( $order_id );
-	 		$_SESSION['tranzila_token'] = mt_rand();
+	 		$_SESSION['tranzila_token'] = $this->get_return_url( $order );
 	 		$_SESSION['encryption-key'] = mt_rand();
 	 		// Get the product list
 	 		global $woocommerce; 	
@@ -164,23 +164,27 @@ function woocommerce_gateway_tranzila_init() {
 } 
 function header_func(){
 	
-	
-	
-	
 	/**
 	 * Returns an encrypted & utf8-encoded
 	 */
+	
 	function encrypt($pure_string) {
+		$dirty = array("+", "/", "=");
+		$clean = array("_PLUS_", "_SLASH_", "_EQUALS_");
 	    $iv_size = mcrypt_get_iv_size(MCRYPT_BLOWFISH, MCRYPT_MODE_ECB);
-	    $iv = mcrypt_create_iv($iv_size, MCRYPT_RAND);
-	    $encrypted_string = mcrypt_encrypt(MCRYPT_BLOWFISH, $_SESSION['encryption-key'], utf8_encode($pure_string), MCRYPT_MODE_ECB, $iv);
-	    return base64_encode($encrypted_string);
+	    $_SESSION['iv'] = mcrypt_create_iv($iv_size, MCRYPT_RAND);
+	    $encrypted_string = mcrypt_encrypt(MCRYPT_BLOWFISH, $_SESSION['encryption-key'], utf8_encode($pure_string), MCRYPT_MODE_ECB, $_SESSION['iv']);
+	    $encrypted_string = base64_encode($encrypted_string);
+	    return str_replace($dirty, $clean, $encrypted_string);
 	}
 
-	function decrypt($encrypted_string) {
-	    $iv_size = mcrypt_get_iv_size(MCRYPT_BLOWFISH, MCRYPT_MODE_ECB);
-	    $iv = mcrypt_create_iv($iv_size, MCRYPT_RAND);
-	    $decrypted_string = mcrypt_decrypt(MCRYPT_BLOWFISH, $_SESSION['encryption-key'],base64_decode($encrypted_string), MCRYPT_MODE_ECB, $iv);
+	function decrypt($encrypted_string) { 
+	 	$dirty = array("+", "/", "=");
+	 	$clean = array("_PLUS_", "_SLASH_", "_EQUALS_");
+	 	
+	 	$string = base64_decode(str_replace($clean, $dirty, $encrypted_string));
+	    
+	    $decrypted_string = mcrypt_decrypt(MCRYPT_BLOWFISH, $_SESSION['encryption-key'],$string, MCRYPT_MODE_ECB, $_SESSION['iv']);
 	    return $decrypted_string;
 	}
 	
@@ -189,7 +193,8 @@ function header_func(){
 	 */	
 	if ($_GET['tranzila']=='sendpayment'){
 		$tranzila_info = unserialize(stripslashes($_GET['data']));
-		$tranzila_info['TranzilaToken'] = encrypt($tranzila_info['TranzilaToken']);
+		$tranzila_info['TranzilaToken'] = encrypt($tranzila_info['TranzilaToken']);	
+		
 		$tranzila_info = json_encode($tranzila_info);
 		?>
 		<script type="text/javascript" src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
@@ -210,8 +215,8 @@ function header_func(){
 	 * Check Encrypted Token
 	 */
 	
-	if ($_GET['tranzila']=='successful-payment'){
-		$decrypted = decrypt($_POST['TranzilaToken'])." ". $_SESSION['tranzila_token'];
+	if (isset($_POST['TranzilaToken'])){
+		$decrypted = trim(decrypt($_POST['TranzilaToken']));		
 		if ($decrypted == $_SESSION['tranzila_token']){
 			$order = new WC_Order($_POST['orderid']);
 			
@@ -223,6 +228,13 @@ function header_func(){
 	
 			// Remove cart
 			WC()->cart->empty_cart();
+			
+			// Redirect to test page
+			?>
+			<script type="text/javascript">
+				window.location.replace("<?php echo $decrypted; ?>");
+			</script>
+			<?php
 		}
 		else{
 			$to = get_option("admin_email");
